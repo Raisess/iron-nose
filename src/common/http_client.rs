@@ -28,22 +28,22 @@ impl HttpClient {
     method: HttpMethod,
     path: &str,
     body: Option<Vec<(&str, &str)>>,
-    cookie: &str,
+    cookie: Option<&str>,
   ) -> Result<Response, Error> {
     match method {
       HttpMethod::GET => {
         let result: Result<Response, Error> =
           self.client.get(self.uri(path))
-            .header(header::COOKIE, cookie)
+            .header(header::COOKIE, cookie.unwrap_or(""))
             .send()
             .await;
 
         return result;
-      }
+      },
       HttpMethod::POST => {
         let result: Result<Response, Error> =
           self.client.post(self.uri(path))
-            .header(header::COOKIE, cookie)
+            .header(header::COOKIE, cookie.unwrap_or(""))
             .header(header::REFERER, self.__host.to_string())
             .form(&body)
             .send()
