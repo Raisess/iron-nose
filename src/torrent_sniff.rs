@@ -28,7 +28,7 @@ impl TorrentSniff {
     }
   }
 
-  pub async fn search(self, term: &str) -> Vec<Torrent> {
+  pub async fn search(&self, term: &str) -> Vec<Torrent> {
     let path = format!("/json?search={}", HttpClient::format(term));
     match self.client.req(HttpMethod::GET, &path, None, None).await {
       Ok(response) => {

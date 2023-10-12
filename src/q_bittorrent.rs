@@ -23,7 +23,7 @@ impl QBittorrent {
       response.headers()["set-cookie"].to_str().unwrap().to_string();
   }
 
-  pub async fn add_torrent(&mut self, name: &str, magnet_link: &str) -> () {
+  pub async fn add_torrent(&self, name: &str, magnet_link: &str) -> () {
     let body = Some([("rename", name), ("urls", magnet_link)].to_vec());
     let response = self.request(HttpMethod::POST, "/api/v2/torrents/add", body)
       .await;
@@ -34,7 +34,7 @@ impl QBittorrent {
   }
 
   async fn request(
-    &mut self,
+    &self,
     method: HttpMethod,
     path: &str,
     body: Option<Vec<(&str, &str)>>,
