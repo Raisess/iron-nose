@@ -6,8 +6,8 @@ use serde_json;
 use tokio;
 
 use iron_nose::common::env::Env;
-use iron_nose::q_bittorrent::QBittorrent;
-use iron_nose::torrent_sniff::TorrentSniff;
+use iron_nose::gateways::q_bittorrent::QBittorrent;
+use iron_nose::gateways::torrent_sniff::TorrentSniff;
 
 const SEARCH_TERMS_FILE: &str = "terms.json";
 

@@ -1,6 +1,6 @@
 use std::{env, str::FromStr};
 
-pub struct Env {}
+pub struct Env;
 
 impl Env {
   pub fn get<T: FromStr>(key: &str, or: &str) -> T {
