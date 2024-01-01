@@ -19,8 +19,12 @@ impl QBittorrent {
     let body = Some([("username", username), ("password", password)].to_vec());
     let response = self.request(HttpMethod::POST, "/api/v2/auth/login", body)
       .await;
-    self.__session_cookie = 
-      response.headers()["set-cookie"].to_str().unwrap().to_string();
+
+    let cookie = response.headers().get("set-cookie");
+    self.__session_cookie = cookie.expect("Wrong password for QBittorrent")
+      .to_str()
+      .unwrap()
+      .to_string();
   }
 
   pub async fn add_torrent(&self, name: &str, magnet_link: &str) -> () {
