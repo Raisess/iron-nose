@@ -1,21 +1,16 @@
-use std::fs;
+use core::time;
+use std::io;
+use std::io::prelude::*;
+use std::thread::sleep;
 
-use env_logger;
-use log::{info, warn};
-use serde_json;
 use tokio;
 
 use iron_nose::common::env::Env;
 use iron_nose::gateways::q_bittorrent::QBittorrent;
 use iron_nose::gateways::torrent_sniff::TorrentSniff;
 
-const SEARCH_TERMS_FILE: &str = "terms.json";
-
 #[tokio::main]
 async fn main() {
-  env_logger::init();
-
-  info!(target: "QBittorrent", "Connecting to client...");
   let mut q_bittorrent = QBittorrent::new(
     &Env::get::<String>("Q_BITTORRENT_HOST", "192.168.3.10"),
     Env::get::<u16>("Q_BITTORRENT_PORT", "8080"),
@@ -26,46 +21,66 @@ async fn main() {
       &Env::get::<String>("Q_BITTORRENT_PASS", "adminadmin"),
     )
     .await;
-  info!(target: "QBittorrent", "Connected and logged in!");
 
   let torrent_sniff = TorrentSniff::new(
     &Env::get::<String>("TORRENT_SNIFF_HOST", "192.168.3.10"),
     Env::get::<u16>("TORRENT_SNIFF_PORT", "8090"),
   );
 
+  loop {
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char); // clear terminal
+    println!("Iron Nose - Torrent Search");
 
-  match fs::read_to_string(SEARCH_TERMS_FILE) {
-    Ok(content) => {
-      let data = serde_json::from_str::<Vec<String>>(&content)
-        .unwrap_or(Vec::new());
+    let search_term = prompt("===> Search: ");
 
-      for item in data {
-        handle_download(&q_bittorrent, &torrent_sniff, item)
-          .await;
+    println!("Searching...");
+    let torrents = torrent_sniff.search(&search_term).await;
+    println!("Showing results...\n");
+
+    let mut i: u8 = 0;
+    for torrent in torrents.iter() {
+      println!("{} - {}", i, torrent.name);
+      println!("Provider: {}", torrent.provider);
+      println!("Links:");
+      let mut j: u8 = 0;
+      for magnet_link in torrent.magnet_links.iter() {
+        println!("\t{}: - {}", j, magnet_link.link);
+        j += 1;
       }
-    },
-    Err(error) => panic!("Failed to read file: {}", error),
+
+      println!("\n-------------------------------\n");
+      i += 1;
+    }
+
+    let target = prompt("===> Option [Movie/Link, e.g.: 1,2]: ");
+    let [torrent_idx, magnet_link_idx] = target.trim()
+      .split(",")
+      .map(|i| i.trim().parse::<usize>().unwrap_or(0))
+      .collect::<Vec<usize>>()[..2]
+      else { panic!("Failed to retrive option") };
+
+    match torrents.get(torrent_idx) {
+      Some(torrent) => {
+        match torrent.magnet_links.get(magnet_link_idx) {
+          Some(magnet_link) => {
+            println!("Adding {} to QBittorrent...", torrent.name);
+            q_bittorrent.add_torrent(&torrent.name, &magnet_link.link).await;
+          },
+          None => println!("Magnet link not found for index: {}", magnet_link_idx),
+        }
+      },
+      None => println!("Torrent not found for index: {}", torrent_idx),
+    }
+
+    sleep(time::Duration::from_secs(3));
   }
 }
 
-async fn handle_download(
-  q_bittorrent: &QBittorrent,
-  torrent_sniff: &TorrentSniff,
-  search_term: String,
-) {
-  info!(target: "TorrentSniff", "Searching for: {}...", search_term);
-  let torrents = torrent_sniff.search(&search_term).await;
-  info!(target: "TorrentSniff", "Search completed, found {} results!", torrents.len());
+fn prompt(text: &str) -> String {
+  print!("{}", text);
 
-  for torrent in torrents {
-    match torrent.magnet_links.get(0) {
-      Some(magnet_link) => {
-        info!(target: "QBittorrent", "Adding {} for download...", torrent.name);
-        q_bittorrent.add_torrent(&torrent.name, &magnet_link.link).await;
-        info!(target: "QBittorrent", "Successfully added {}", torrent.name);
-        break;
-      },
-      None => warn!("No magnet link found for torrent: {}", torrent.name),
-    }
-  }
+  let mut input = String::new();
+  io::stdout().flush().unwrap();
+  io::stdin().read_line(&mut input).expect("No input");
+  return input;
 }
